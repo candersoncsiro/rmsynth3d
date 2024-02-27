@@ -204,31 +204,56 @@ def save_to_fits(cube, output_filename, rm_range, rm_incr, p_header):
 	# Create a Primary HDU object from the transposed data cube
 	hdu = fits.PrimaryHDU(cube_transposed)
 
-	# Create a new header by copying p_header, to include all original metadata
+	# Use P_header as a template for correct wcs coords etc, which we then update to reflect 3D cube
 	hdr = p_header.copy()
+	hdr_updated = update_header_for_3d(hdr, cube_transposed.shape, rm_range, rm_incr)
 
-	# Now, update or add the specific keys related to the 3D cube and Faraday depth axis
-	# Configure the RA and Dec axes based on the 2D polarized intensity data's header
-	# Assuming the 2D data corresponds to the first two axes after transposing
-	hdr['NAXIS'] = 3  # Update the number of axes to 3 for the 3D cube
-	hdr['NAXIS3'] = cube.shape[0]  # Update the third axis length
-
-	# Update keys for the Faraday depth axis
-	hdr['CTYPE3'] = 'FARADAY'
-	hdr['CDELT3'] = rm_incr
-	hdr['CRVAL3'] = rm_range[0]
-	hdr['CRPIX3'] = 1
-
-	# Remove any keys that are invalid for the 3D data cube
-	# For example, if there are specific 2D-related keys that don't apply, remove them here
-	# would do e.g.: hdr.remove('INVALID_KEY', ignore_missing=True)
-
-	# Assign the modified header to the HDU
-	hdu.header = hdr
-
-	# Save the HDU to a new FITS file
+	# Now, hdr_updated contains the correctly ordered header for the 3D cube
+	# Proceed with assigning it to your HDU and saving the FITS file
+	hdu = fits.PrimaryHDU(data=cube_transposed, header=hdr_updated)
 	print('Saving outfile: %s.'%output_filename)
 	hdu.writeto(output_filename, overwrite=True)
+
+def update_header_for_3d(hdr, cube_shape, rm_range, rm_incr):
+    """
+    Update the FITS header for a 3D cube, ensuring correct card placement. Otherwise Astropy throws an error and quits.
+    
+    Parameters:
+    - hdr: The original 2D FITS header to be updated.
+    - cube_shape: The shape of the 3D data cube (depth, height, width).
+    - rm_range: The range of the Faraday depth values.
+    - rm_incr: The increment of the Faraday depth values.
+    
+    Returns:
+    - Updated FITS header for the 3D cube.
+    """
+    # Ensure NAXIS is correct for 3D data
+    hdr['NAXIS'] = 3
+    hdr['NAXIS1'] = cube_shape[2]
+    hdr['NAXIS2'] = cube_shape[1]
+    
+    # Properly insert NAXIS3 after NAXIS2 to maintain correct order, otherwise Astropy FITS verify throws an error 
+    if 'NAXIS3' in hdr:
+        hdr['NAXIS3'] = cube_shape[0]  # Update existing card if it already exists
+    else:
+        hdr.insert('NAXIS2', ('NAXIS3', cube_shape[0]), after=True)  # Insert after NAXIS2
+    
+    # Update or insert the Faraday depth axis information
+    hdr['CTYPE3'] = 'FARADAY'
+    hdr['CDELT3'] = rm_incr
+    hdr['CRVAL3'] = rm_range[0]
+    hdr['CRPIX3'] = 1
+    
+    ## Placeholder code thus far found to be unnecessary, but which could in principle be needed to ensure FITS compatability
+    # Ensure EXTEND is correctly placed if necessary
+    if 'EXTEND' in hdr:
+        # If EXTEND exists, ensure it's correctly positioned; this might be more complex depending on header structure
+        pass  # Implementation depends on existing header structure and requirements
+    
+    # Remove any irrelevant keys
+    # hdr.remove('INVALID_KEY', ignore_missing=True)
+    
+    return hdr
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description=main.__doc__)
