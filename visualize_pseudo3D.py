@@ -28,7 +28,11 @@ def resample_cube(cube, factors):
 	Returns:
 	ndarray: The resampled 3D numpy array.
 	"""
-	print(f"\nResampling cube by factors {factors} along RA, Dec, RM axes...")
+	# The following 'if' statement, and forced resampling (even with factors (1, 1, 1)  is a kludge to to avoid a strange bug in in VTK if the cube is not re-sampled, even for unit re-sample factors (i.e. no nominal change to cube). See also 'load_fits_data' function. Moving this out of "if" statement as a kludge fix. (Error is: site-packages/tvtk/util/ctf.py:123: RuntimeWarning: invalid value encountered in double_scalars). 
+	if any(f != 1 for f in factors):
+		print(f"\nResampling cube by factors {factors} along RA, Dec, RM axes...")
+	else:
+		pass
 	return zoom(cube, zoom=factors, order=0)  # Using order=0 for NN interpolation
 
 def validate_resample_factors(factors):
@@ -120,12 +124,13 @@ def load_fits_data(file_path, user_resample_factors):
 							 f"Recommended maximum factor for this dimension: {necessary_factors[i-1]:.2f}.")
 
 	# If this point is reached, the user's factors are deemed sufficient, or no resampling is needed
-	print("User-specified resampling factors are within acceptable limits.")
+	print(user_resample_factors)
 	if any(f != 1 for f in user_resample_factors):
-		print("\nApplying user-specified resampling factors...")
-		data_transposed = resample_cube(data_transposed, user_resample_factors)
-		resampled_dims = data_transposed.shape  # Dimensions after resampling
-
+		print("User-specified resampling factors are within acceptable limits.")
+	
+	#Currently, there is a strange bug that triggers deep in VTK if the cube is not re-sampled, even for unit re-sample factors (i.e. no nominal change to cube). Moving this out of "if" statement as a kludge fix. (Error is: site-packages/tvtk/util/ctf.py:123: RuntimeWarning: invalid value encountered in double_scalars)
+	data_transposed = resample_cube(data_transposed, user_resample_factors)
+	
 	return data_transposed
 
 def main():
