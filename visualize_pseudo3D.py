@@ -28,14 +28,14 @@ def resample_cube(cube, factors):
 	Returns:
 	ndarray: The resampled 3D numpy array.
 	"""
-	print(f"\nResampling cube by factors: {factors}")
-	return zoom(cube, zoom=factors, order=1)  # Using order=1 for bilinear interpolation
+	print(f"\nResampling cube by factors {factors} along RA, Dec, RM axes...")
+	return zoom(cube, zoom=factors, order=0)  # Using order=0 for NN interpolation
 
 def validate_resample_factors(factors):
 	"""
 	Validates that the resampling factors meet the specified requirements.
 	"""
-	if any(f > 1 for f in factors[1:]):
+	if any(f > 1 for f in factors[:-1]):
 		raise ValueError("Invalid resampling factors. RA and Dec factors must be <= 1.")
 
 def check_for_nans_infs(cube):
@@ -61,10 +61,8 @@ def render_3d_cube(cube):
 	check_for_nans_infs(cube)  # Check for NaNs and Infs before rendering
 	print(f"Data range of cube: min={cube.min():.2g}, max={cube.max():.2g}")
 	print('Rendering cube output...')
-	#Mayavi uses the VTK axis ordering conventions, which are woeful. Nevertheless, transpose to suit them, so we don't have to play games with roll angles and strange az and elevation inits later.
-	cube_transposed = np.transpose(cube, (2, 1, 0)) 
-	src = mlab.pipeline.scalar_field(cube_transposed)
-	vol = mlab.pipeline.volume(src, vmin=cube_transposed.min(), vmax=cube_transposed.max())
+	src = mlab.pipeline.scalar_field(cube)
+	vol = mlab.pipeline.volume(src, vmin=cube.min(), vmax=cube.max())
 	vol._volume_property.scalar_opacity_unit_distance = 0.1
 	#View orientation init --- looking down the FD axis (neg->pos)
 	mlab.view(azimuth=0, elevation=0)  
@@ -107,7 +105,9 @@ def load_fits_data(file_path, user_resample_factors):
 	print('Loading FITS...')
 	with fits.open(file_path) as hdul:
 		data = hdul[0].data
-		original_dims = data.shape  # Original dimensions of the data cube (RM, RA, Dec)
+		# deal with Astropy / Astropy FTIS axis ordering convention mismatch
+		data_transposed = np.transpose(data, (2, 1, 0)) 
+		original_dims = data_transposed.shape  # Original dimensions of the data cube (RM, RA, Dec)
 
 	# Calculate necessary resample factors to keep dimensions within limits that are less likely to produce OOM errors, long runtimes, etc.
 	necessary_factors = calculate_resample_factors(original_dims[1:], max_pixels=2000)  # Skip RM dimension for this calculation
@@ -116,17 +116,17 @@ def load_fits_data(file_path, user_resample_factors):
 	for i, factor in enumerate(user_resample_factors[1:], start=1):  # Again, skip RM dimension
 		if original_dims[i] * factor > 2000:
 			raise ValueError(f"Specified or default resample factor for dimension {i} ({factor}) will result in more than 2000 pixels. "
-							 "Please adjust the -rsf flag to ensure dimensions do not exceed this limit. "
+							 "Please adjust the --rsf flag to ensure dimensions do not exceed this limit. "
 							 f"Recommended maximum factor for this dimension: {necessary_factors[i-1]:.2f}.")
 
 	# If this point is reached, the user's factors are deemed sufficient, or no resampling is needed
 	print("User-specified resampling factors are within acceptable limits.")
 	if any(f != 1 for f in user_resample_factors):
 		print("\nApplying user-specified resampling factors...")
-		data = resample_cube(data, user_resample_factors)
-		resampled_dims = data.shape  # Dimensions after resampling
+		data_transposed = resample_cube(data_transposed, user_resample_factors)
+		resampled_dims = data_transposed.shape  # Dimensions after resampling
 
-	return data
+	return data_transposed
 
 def main():
 	"""
@@ -135,7 +135,7 @@ def main():
 	parser = argparse.ArgumentParser(description=globals()['__doc__'])
 	parser.add_argument("file_path", help="Path to the FITS file containing the 3D data cube")
 	parser.add_argument("--rsf", nargs=3, type=float, default=[1, 1, 1],
-						help="Multiplicative resampling factors for each dimension (RM, RA, Decl), e.g., 2 0.2 0.2 will increase the number of pixels in the RM dim by a factor of 2 (expanding it in the viz cube), and reduce the number of pixels in RA and Dec by a factor of 5 in each case. Factors above 1 are not alowed for the RA and Dec dims, becuase they tend to produce long runtimes and Out Of Memory (OOM) errors.")
+						help="Multiplicative resampling factors for each dimension (RA, Decl), e.g., 0.2 0.2 2 will reduce the number of pixels in RA and Dec by a factor of 5 in each case, and increase the number of pixels in the RM dim by a factor of 2 (expanding it in the viz cube). Factors above 1 are not alowed for the RA and Dec dims, becuase they tend to produce long runtimes and Out Of Memory (OOM) errors.")
 	args = parser.parse_args()
 
 	# Validate rsf before proceeding
