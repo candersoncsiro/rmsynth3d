@@ -1,50 +1,39 @@
-import numpy as np
+#!/usr/bin/env python3
+
+# Standard library imports
 import argparse
-from astropy.io import fits
+
+# Related third-party imports
+import numpy as np
 from scipy.ndimage import gaussian_filter
+from astropy.io import fits
 
-def main(p_filename, rm_filename, output_filename, rm_min, rm_max, rm_incr, smooth_sigma):
-	"""
-	generate_pseudo3D.py. Written by Craig Anderson and Larry Rudnick in Feb 2024.
+docstring =	"""
+generate_pseudo3D.py. Written by Craig Anderson and Larry Rudnick in Feb 2024 and described in Rudnick et al., 2024, MNRAS, submitted.
 
-	Generates a FITS cube from polarized intensity and Faraday depth data, applying Gaussian smoothing
-	to create a pseudo-3D visualization ready for analysis or further rendering. Implements the
-	method described in Rudnick+2024.
+Generates a FITS cube from FITS maps of polarized intensity and Faraday depth, with user-specified Gaussian smoothing in Faraday depth.  The output FITS cube can be viewed in any appropriate software package, such as ds9 or CARTA, or used as input to the visualize_pseudo3D.py script.
 
-	Usage:
-		python generate_pseudo3D.py p_filename.fits rm_filename.fits output_cube.fits --rm_min -100 --rm_max 100 --rm_incr 1 --smooth_sigma 3
+Usage:
+	python generate_pseudo3D.py p_filename.fits rm_filename.fits output_cube.fits 
+--rm_min -100 --rm_max 100 --rm_incr 1 --smooth_sigma 3
 
-	Parameters:
-		p_filename (str): Path to the polarized intensity FITS file.
-		rm_filename (str): Path to the Faraday depth FITS file.
-		output_filename (str): Path for the output FITS cube file.
-		rm_min (int, rad/m^2): Minimum Faraday depth value.
-		rm_max (int, rad/m^2): Maximum Faraday depth value.
-		rm_incr (float, rad/m^2): Pixel size in Faraday depth space.
-		smooth_sigma (odd integer, channels): Smoothing factor (standard deviation of the Gaussian kernel) applied along
-							  the Faraday depth axis for the pseudo 3D representation.
-							  
-	NOTE: Input FITS maps must currently have NAXIS=3 with a singleton degenerate 'LINEAR' type axis (shape: 1, 4000, 4000), or script will fail. Dev work to handle a more diverse array of inputs welcome!
-	"""
+Parameters:
+	p_filename (str): Path to the polarized intensity FITS file.
+	rm_filename (str): Path to the Faraday depth FITS file.
+	output_filename (str): Path for the output FITS cube file.
+	rm_min (int, rad/m^2): Minimum Faraday depth value.
+	rm_max (int, rad/m^2): Maximum Faraday depth value.
+	rm_incr (float, rad/m^2): Pixel size in Faraday depth space.
+	smooth_sigma (odd integer, channels): Smoothing factor (standard deviation of the Gaussian kernel) applied along  the Faraday depth axis for the pseudo 3D representation.
 
-	# Input Validation
-	if rm_min >= rm_max:
-		print("Error: 'rm_min' should be less than 'rm_max'.")
-		return  # Exit the function early
+The file names have no defaults.
+					  
+NOTE: This script has been tested and verified on FITS maps that either have NAXIS=2, or NAXIS=3 with a singleton degenerate 'LINEAR' type axis (shape: <4000,<4000,1). Development work to handle other possible cases is most welcome!
 
-	if rm_incr <= 0:
-		print("Error: 'rm_incr' should be greater than 0.")
-		return  # Exit the function early
+Installation requirements:  
+numpy, astropy, scipy
 
-	if smooth_sigma <= 0:
-		print("Error: 'smooth_sigma' should be greater than 0.")
-		return  # Exit the function early
-
-	# Run processes
-	rm_range = (rm_min, rm_max)
-	p_data, rm_data, p_header = load_and_mask_fits(p_filename, rm_filename, rm_range)
-	cube = generate_3d_rm_map(p_data, rm_data, rm_range, rm_incr, smooth_sigma)
-	save_to_fits(cube, output_filename, rm_range, rm_incr, p_header)
+"""
 
 def load_and_mask_fits(p_filename, rm_filename, rm_range):
 	"""
@@ -255,8 +244,29 @@ def update_header_for_3d(hdr, cube_shape, rm_range, rm_incr):
     
     return hdr
 
+def main(p_filename, rm_filename, output_filename, rm_min, rm_max, rm_incr, smooth_sigma):
+
+	# Input Validation
+	if rm_min >= rm_max:
+		print("Error: 'rm_min' should be less than 'rm_max'.")
+		return  # Exit the function early
+
+	if rm_incr <= 0:
+		print("Error: 'rm_incr' should be greater than 0.")
+		return  # Exit the function early
+
+	if smooth_sigma <= 0:
+		print("Error: 'smooth_sigma' should be greater than 0.")
+		return  # Exit the function early
+
+	# Run processes
+	rm_range = (rm_min, rm_max)
+	p_data, rm_data, p_header = load_and_mask_fits(p_filename, rm_filename, rm_range)
+	cube = generate_3d_rm_map(p_data, rm_data, rm_range, rm_incr, smooth_sigma)
+	save_to_fits(cube, output_filename, rm_range, rm_incr, p_header)
+
 if __name__ == '__main__':
-	parser = argparse.ArgumentParser(description=main.__doc__)
+	parser = argparse.ArgumentParser(description=docstring, formatter_class=argparse.RawDescriptionHelpFormatter)
 
 	parser.add_argument('p_filename', help='Polarized intensity FITS file path. Data must have NAXIS=3 (shape: 1, 4000, 4000), or script will fail.')
 	parser.add_argument('rm_filename', help='Faraday depth FITS file path. Data must have NAXIS=3 (shape: 1, 4000, 4000), or script will fail.')
