@@ -1,23 +1,40 @@
-"""
-`visualize_pseudo3D.py`: A tool for 3D volumetric visualization of RA, Decl, RM FITS data cubes. Developed by Craig Anderson and Larry Rudnick, February 2024. This script is a companion to 'generate_pseudo3D.py' and supports the findings presented in Rudnick+2024.
-
-Usage example: `python visualize_pseudo3D.py path/to/your/data_cube.fits --rsf 1.5 0.25 0.25`
-
-Positional arguments:
-- `file_path` (str): The path to the FITS file intended for 3D rendering.
-
-Optional arguments:
---rsf X Y Z allows for specifying multiplicative resampling factors X Y Z for each dimension (RM, RA, Decl) of the data cube, adjusting the number of pixels in each dimension to refine the visualization or manage computational resources. For instance, `--rsf 1.5 0.25 0.25` will increase the RM dimension by a factor of 1.5, while reducing the RA and Dec dimensions by a factor of 4, enhancing certain visualization aspects or alleviating memory constraints. Note: Resampling factors above 1 for RA and Dec are discouraged due to potential for long runtimes and memory issues.
-
-Features:
-- Utilizes Mayavi for interactive 3D visualization, offering the full feature set of this package.
-"""
+#!/usr/bin/env python3
 
 import numpy as np
 import argparse
 from astropy.io import fits
 from mayavi import mlab
 from scipy.ndimage import zoom
+
+docstring="""
+Generate Pseudo3D Visualizations from FITS Cubes.
+
+This script, generate_pseudo3D.py, produces 3D volumetric renders of FITS cubes of RA, Decl, Faraday depth. Developed by Craig Anderson and Larry Rudnick, February 2024. This script is a companion to 'generate_pseudo3D.py' and supports the findings presented in Rudnick+2024.
+
+Usage:
+    python visualize_pseudo3D.py <file_path> --rsf X Y Z
+
+Example:
+    python visualize_pseudo3D.py /path/to/data_cube.fits --rsf 0.5 0.5 2
+
+Parameters:
+    file_path (str): Path to the FITS cube file.
+    --rsf (X Y Z): Resampling factors for RA, Dec, and Faraday depth, respectively.
+
+Note: For RA and Dec, only resampling factors <1 are allowed, and will reduce the number of pixels along those axes by that multiplicative factor, with the size of each pixel increased.
+For Faraday depth, factors may be <1 or >1. For an rsf>1, the number of pixels along the Faraday depth axis will be increased by that multiplicative value, and the size of each pixel correspondingly decreased.
+Choices of resampling factors may be useful to manage computational resources and to improve the visualization of structures in Faraday space. 
+
+Features:
+- Utilizes Mayavi for interactive 3D visualization, offering up to the full feature set of this package, depending on installation. Mayavi has known installation issues that can render some advanced functionality inoperable. When available, a robust recipe for obtaining the full mayavi functionality will be provided here.
+
+Installation requirements:  
+	numpy, astropy, scipy, mayavi (which requires vtk and a GUI toolkit)*
+
+    
+*See, e.g.,  https://docs.enthought.com/mayavi/mayavi/installation.html or https://github.com/prabhuramachandran/mayavi-tutorial/blob/master/installation.md
+"""
+
 
 def resample_cube(cube, factors):
 	"""
@@ -137,7 +154,7 @@ def main():
 	"""
 	Main function to parse command line arguments and render the 3D data cube from a FITS file.
 	"""
-	parser = argparse.ArgumentParser(description=globals()['__doc__'])
+	parser = argparse.ArgumentParser(description=docstring, formatter_class=argparse.RawDescriptionHelpFormatter)
 	parser.add_argument("file_path", help="Path to the FITS file containing the 3D data cube")
 	parser.add_argument("--rsf", nargs=3, type=float, default=[1, 1, 1],
 						help="Multiplicative resampling factors for each dimension (RA, Decl), e.g., 0.2 0.2 2 will reduce the number of pixels in RA and Dec by a factor of 5 in each case, and increase the number of pixels in the RM dim by a factor of 2 (expanding it in the viz cube). Factors above 1 are not alowed for the RA and Dec dims, becuase they tend to produce long runtimes and Out Of Memory (OOM) errors.")
