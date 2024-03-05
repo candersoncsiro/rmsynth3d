@@ -1,7 +1,7 @@
 # rmsynth3d
 Repository for code that generates and visualizes pseudo-3D FITS images from radio astronomy polarization data. Its initial release and comments on its usage are in Rudnick et al. (2024, MNRAS, submitted).
 
-The repository currently consists of two scripts:
+The repository currently consists of two scripts, written in python 3:
 
 1.	generate_pseudo3D.py
    
